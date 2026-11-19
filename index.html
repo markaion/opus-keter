@@ -4602,7 +4602,7 @@ function sayLine(id){
     s.onended = () => { if (VSRC === s){ VSRC = null; duckTo(1, 0.6); } };
   });
 }
-function voiceBusy(){ if (!VOICE || !AU.ctx || !vId) return false; const now = AU.ctx.currentTime; if (vUntil === Infinity) return now - vReq < 5; return now < vUntil + 0.35; }
+function voiceBusy(){ if (!VOICE || !AU.ctx || !vId) return false; const now = AU.ctx.currentTime; if (vUntil === Infinity) return now - vReq < 12; return now < vUntil + 0.35; }
 function prefetch(ids){ if (!VOICE || !AU.ctx) return; ids.forEach(id => id && (VOXDUR[LANG] || {})[id] && vbuf(LANG, id)); }
 
 /* ─────────────── lines, plates, truths, cards ─────────────── */
@@ -4736,7 +4736,29 @@ function buildCues(sc, k){
   const L = SCRIPT.lines[sc.key] || [];
   sc.cues = (sc.at || []).map((t, j) => L[j] ? Object.assign({ t, id: `${sc.key}.${j}` }, L[j]) : null).filter(Boolean);
 }
-function nextCueTime(sc){ const c = sc.cues || []; for (const q of c) if (q.t > st + 0.05) return q.t; return sc.dur - 2.2; }
+/* pacing: each line (or truth) owns a segment of the movement clock, from its cue to the next.
+   If the segment is shorter than the line needs — the narration clip when the voice is on,
+   a calm reading time when it is off — the movement clock slows for that segment, so pictures,
+   score and text all keep together and nothing is cut off or rushed. */
+function segList(sc){
+  if (sc._seg) return sc._seg;
+  let s;
+  if (sc.key === 'M8'){ const ts = [3, 28, 53, 75.5]; s = SCRIPT.truths.map((T, i) => ({ t:ts[i], e:ts[i + 1], id:'T' + i, truth:T })); }
+  else { const c = sc.cues || []; s = c.map((q, i) => ({ t:q.t, e:i < c.length - 1 ? c[i + 1].t : sc.dur - 2.2, id:q.id, cue:q })); }
+  return sc._seg = s;
+}
+function segNeed(q){
+  const ru = LANG === 'ru', cps = ru ? 13.5 : 15, lead = q.truth ? 0.9 : 0.7;
+  const pl = q.truth ? q.truth.plate : q.cue.plate;
+  const txt = q.truth ? q.truth['title_' + LANG] + ' ' + q.truth['body_' + LANG] : cueText(q.cue);
+  const pn = (PLATES && pl) ? ((ru ? pl.ru : pl.en) || '').length + (pl.old ? ((ru ? pl.old.ru : pl.old.en) || '').length : 0) : 0;
+  if (VOICE && AU.on){ const d = (VOXDUR[LANG] || {})[q.id]; if (d) return max(lead + d + 0.9, lead + 3.5); }
+  if (SUBS || q.truth) return lead + max(3.5, 1 + txt.length / cps) + pn / 45;
+  return pn ? lead + 2.5 + pn / 30 : 0;
+}
+function curSeg(sc){ let q = null; for (const x of segList(sc)) if (st >= x.t) q = x; return q && st < q.e ? q : null; }
+let PACE = 1, SEGQ = null, SEGT = 0;
+function nextCueTime(sc){ for (const q of segList(sc)){ if (q.t > st + 0.05) return q.t; if (q.e > st + 0.05) return q.e; } return sc.dur - 2.2; }
 function go(i, soft = false){
   hush(); stopVoice(0.2); hideTruth(); hidePlate();
   si = clamp(i, 0, SC.length - 1); st = 0; ended = false;
@@ -4763,14 +4785,21 @@ function frame(ts){
   drawStars(T);
   if (!started){ g.save(); try { drawGateArt(T, dt, { hover:GH, hoverAge:T - GHt, box:gateBox() }); } catch (e) { console.error(e); } g.restore(); }
   else if (si >= 0){
-    const sc = SC[si]; let adv = paused ? 0 : dt;
-    if (adv && !ended && VOICE && voiceBusy() && st + adv >= nextCueTime(sc) - 0.02) adv = 0;   /* voice hold */
+    const sc = SC[si], q = curSeg(sc);
+    if (q !== SEGQ){ SEGQ = q; SEGT = T; }
+    const need = q ? segNeed(q) : 0, tgt = q && need > q.e - q.t ? max(0.35, (q.e - q.t) / need) : 1;
+    PACE += (tgt - PACE) * min(1, dt * 2.5);
+    let adv = paused ? 0 : dt * PACE;
+    if (adv && !ended && st + adv >= nextCueTime(sc) - 0.02){
+      if (VOICE && voiceBusy()) adv = 0;                         /* voice hold: never cut a line off */
+      else if (q && T - SEGT < need - 0.05) adv = 0;            /* reading hold: a line stays until it can be read */
+    }
     if (ended) adv = 0;
     st += adv;
     if (!ended && sc.cues && sc.cues.length){
       let idx = -1; for (let k = 0; k < sc.cues.length; k++) if (st >= sc.cues[k].t) idx = k;
       if (st > sc.dur - 2.2) idx = -2;
-      if (idx !== sc._li){ sc._li = idx; showLine(idx >= 0 ? sc.cues[idx] : null); if (idx >= 0) prefetch([sc.cues[idx + 1]?.id, sc.cues[idx + 2]?.id]); }
+      if (idx !== sc._li){ sc._li = idx; showLine(idx >= 0 ? sc.cues[idx] : null); if (idx >= 0) prefetch([sc.cues[idx + 1]?.id, sc.cues[idx + 2]?.id, sc.cues[idx + 3]?.id]); }
     }
     if (sc.ev && !ended) while (sc._e < sc.ev.length && st >= sc.ev[sc._e][0]){ try { sc.ev[sc._e][1](); } catch (e) { console.error(e); } sc._e++; }
     g.save(); try { sc.draw(st, adv); } catch (e) { console.error(e); } g.restore();
