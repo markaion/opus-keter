@@ -169,7 +169,7 @@ button:focus-visible{ outline:2px solid var(--emerald); outline-offset:4px; }
     </div>
     <button id="enter" data-i="enter"></button>
     <p class="intent"><b>Intentio</b><span data-i="intent"></span></p>
-    <p class="small"><span data-i="small"></span><br><button class="lnk" id="atlasLink" data-i="atlas"></button></p>
+    <p class="small"><span data-i="small"></span><br><span data-i="hint"></span><br><button class="lnk" id="atlasLink" data-i="atlas"></button></p>
   </div>
 </div>
 
@@ -187,7 +187,9 @@ button:focus-visible{ outline:2px solid var(--emerald); outline-offset:4px; }
 <div id="treeTip"></div>
 <div id="ctl">
   <button id="bPrev" aria-label="Previous movement">‹</button>
+  <button id="bBack" aria-label="Previous line">«</button>
   <button id="bPlay" aria-label="Pause" data-i="pause"></button>
+  <button id="bFwd" aria-label="Next line">»</button>
   <button id="bNext" aria-label="Next movement">›</button>
   <svg id="tree" viewBox="-14 -8 28 64" aria-label="Movements"></svg>
   <button id="bLang">RU</button>
@@ -464,7 +466,9 @@ function audioInit(){
   const lfo = ctx.createOscillator(); lfo.frequency.value = 0.05; const lg = ctx.createGain(); lg.gain.value = 220; lfo.connect(lg); lg.connect(lp.frequency); lfo.start();
   AU.drone = out; AU.droneLP = lp;
 }
+let MOOD = { drone:null, room:0, grain:0 };
 function droneTo(gain, cutoff, shift = 1, time = 4){
+  MOOD.drone = [gain, cutoff, shift];
   if (!AU.ctx) return; const t = AU.ctx.currentTime, k = time / 3;
   AU.drone.gain.cancelScheduledValues(t); AU.drone.gain.setTargetAtTime(gain, t, k);
   AU.droneLP.frequency.setTargetAtTime(cutoff, t, k);
@@ -523,7 +527,7 @@ function chant(seq = 'IAOAI', step = 1.5, vol = 0.14, f0 = 55){
 function chord(fs, vol = 0.05, dur = 10){ fs.forEach((f, i) => bell(f, i * 0.12, dur, vol, (i / (fs.length - 1 || 1)) * 1.2 - 0.6)); }
 
 /* ─────────────── new voices, built from the same engine ─────────────── */
-function roomTo(mix, time = 2){ if (!AU.ctx) return; const t = AU.ctx.currentTime, k = time / 3; AU.wetHall.gain.setTargetAtTime(0.6 * (1 - mix) + 0.08, t, k); AU.wetRoom.gain.setTargetAtTime(0.55 * mix, t, k); }
+function roomTo(mix, time = 2){ MOOD.room = mix; if (!AU.ctx) return; const t = AU.ctx.currentTime, k = time / 3; AU.wetHall.gain.setTargetAtTime(0.6 * (1 - mix) + 0.08, t, k); AU.wetRoom.gain.setTargetAtTime(0.55 * mix, t, k); }
 function duckTo(v, time = 0.25){ if (!AU.ctx) return; AU.duck.gain.setTargetAtTime(v, AU.ctx.currentTime, time / 3); }
 function noiseBuf(sec){ const c = AU.ctx, len = floor(c.sampleRate * sec), b = c.createBuffer(1, len, c.sampleRate), d = b.getChannelData(0); for (let i = 0; i < len; i++) d[i] = random() * 2 - 1; return b; }
 function tick(pan = 0, vol = 0.08){
@@ -579,6 +583,7 @@ function knock(vol = 0.3){
 }
 let GRAIN = null;
 function grainTo(v, time = 1){
+  MOOD.grain = v;
   if (!AU.ctx) return; const c = AU.ctx;
   if (!GRAIN){ const src = c.createBufferSource(); src.buffer = noiseBuf(4); src.loop = true; const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2400; const gn = c.createGain(); gn.gain.value = 0; src.connect(lp); lp.connect(gn); gn.connect(AU.bus); src.start(); GRAIN = gn; }
   GRAIN.gain.setTargetAtTime(v, c.currentTime, time / 3);
@@ -4527,7 +4532,8 @@ const UI = {
     voice:'Voice', subs:'Subtitles', plates:'Plate notes', enter:'Enter',
     intent:'Written and run with one intention: that whatever comes through be benevolent, wise, and true.',
     small:'About fifteen minutes. Best in darkness, with headphones. A snowflake is grown for this sitting only.',
-    atlas:'Open the Atlas', endline:'The work continues in matter.', again:'Begin again', close:'close',
+    atlas:'Open the Atlas', back:'Previous line', fwd:'Next line', prevM:'Previous movement', nextM:'Next movement',
+    hint:'To read a line again, press « or the left arrow. » or the right arrow moves on a line; ‹ and › change movement.', endline:'The work continues in matter.', again:'Begin again', close:'close',
     pause:'pause', play:'play', voiceS:'voice', subsS:'subs', platesS:'plates', sound:'sound', full:'full', tab:'TABULA',
     m:'Measured', t:'Theory', s:'Symbol', w:'Testimony', r:'Retired',
     wm:'Repeated observation or experiment.', wt:'A serious model that is still argued.', ws:'True as a picture, not as a mechanism.', ww:'Lived experience, reported honestly and not generalised.', wr:'A popular claim that was tested and not supported.',
@@ -4539,7 +4545,8 @@ const UI = {
     voice:'Голос', subs:'Субтитры', plates:'Примечания', enter:'Войти',
     intent:'Написано и запущено с одним намерением: пусть всё, что придёт, будет благим, мудрым и истинным.',
     small:'Около пятнадцати минут. Лучше в темноте и в наушниках. Снежинка растёт только для этого сеанса.',
-    atlas:'Открыть атлас', endline:'Работа продолжается в материи.', again:'Начать снова', close:'закрыть',
+    atlas:'Открыть атлас', back:'Предыдущая строка', fwd:'Следующая строка', prevM:'Предыдущее движение', nextM:'Следующее движение',
+    hint:'Чтобы перечитать строку, нажми « или стрелку влево. » или стрелка вправо — следующая строка; ‹ и › — смена движения.', endline:'Работа продолжается в материи.', again:'Начать снова', close:'закрыть',
     pause:'пауза', play:'дальше', voiceS:'голос', subsS:'текст', platesS:'примеч.', sound:'звук', full:'экран', tab:'ТАБЛИЦА',
     m:'Измерено', t:'Теория', s:'Символ', w:'Свидетельство', r:'Отвергнуто',
     wm:'Повторённое наблюдение или эксперимент.', wt:'Серьёзная модель, о которой ещё спорят.', ws:'Истинно как образ, а не как механизм.', ww:'Прожитый опыт, рассказанный честно и не обобщённый.', wr:'Популярное утверждение, которое проверили и не подтвердили.',
@@ -4694,6 +4701,7 @@ function applyLang(){
   $('lEn').classList.toggle('on', LANG === 'en'); $('lRu').classList.toggle('on', LANG === 'ru');
   $('bLang').textContent = LANG === 'en' ? 'RU' : 'EN';
   $('bPlay').textContent = paused ? ui('play') : ui('pause');
+  [['bBack', 'back', '←'], ['bFwd', 'fwd', '→'], ['bPrev', 'prevM', 'Shift ←'], ['bNext', 'nextM', 'Shift →']].forEach(([id, k, key]) => { const b = $(id); b.title = `${ui(k)} (${key})`; b.setAttribute('aria-label', ui(k)); });
   if (started && si >= 0){
     const t = SCRIPT.titles[si]; cardEl.querySelector('.tab').textContent = `${ui('tab')} ${t.num} · ${t.latin}`; cardEl.querySelector('.ttl').textContent = LANG === 'ru' ? t.ru : t.en;
     if (curCue && curCue.truth === undefined && lineEl.classList.contains('on')){ lineEl.textContent = cueText(curCue); if (curCue.plate) showPlate(curCue.plate); }
@@ -4729,7 +4737,7 @@ function buildCues(sc, k){
   sc.cues = (sc.at || []).map((t, j) => L[j] ? Object.assign({ t, id: `${sc.key}.${j}` }, L[j]) : null).filter(Boolean);
 }
 function nextCueTime(sc){ const c = sc.cues || []; for (const q of c) if (q.t > st + 0.05) return q.t; return sc.dur - 2.2; }
-function go(i){
+function go(i, soft = false){
   hush(); stopVoice(0.2); hideTruth(); hidePlate();
   si = clamp(i, 0, SC.length - 1); st = 0; ended = false;
   $('end').classList.remove('on');
@@ -4737,7 +4745,7 @@ function go(i){
   lineEl.classList.remove('on'); clearTimeout(lineTO); curCue = null;
   starTarget = sc.star ?? 0.2; lineEl.classList.toggle('boom', !!sc.boom); LAD.fade = 1; LAD.off = false;
   if (sc.enter) sc.enter();
-  showCard(si); paintTree();
+  if (!soft) showCard(si); paintTree();
   prefetch((sc.cues || []).slice(0, 2).map(c => c.id).concat(sc.key === 'M8' ? ['T0'] : []));
 }
 function fmt(d){ return d.toLocaleTimeString(LANG === 'ru' ? 'ru-RU' : [], { hour:'2-digit', minute:'2-digit' }); }
@@ -4772,6 +4780,38 @@ function frame(ts){
   requestAnimationFrame(frame);
 }
 
+/* ─────────────── stepping line by line, so any line can be read again ─────────────── */
+function cueTimes(sc){ if (!sc.cues) buildCues(sc); return sc.key === 'M8' ? [3, 28, 53] : sc.cues.map(c => c.t); }
+function seekTo(i, t){
+  stopVoice(0.1); hush();
+  const sameMove = i === si, live = AU.ctx; AU.ctx = null;           /* silent while fast-forwarding */
+  try {
+    go(i, sameMove); const sc = SC[si], stateful = sc.key === 'M2';
+    g.save(); g.beginPath(); g.rect(0, 0, 0, 0); g.clip();             /* the replay draws nothing */
+    while (st < t - 1e-6){
+      const d = min(0.1, t - st); st += d;
+      if (sc.ev) while (sc._e < sc.ev.length && st >= sc.ev[sc._e][0]){ try { sc.ev[sc._e][1](); } catch (err) {} sc._e++; }
+      if (stateful){ try { sc.draw(st, d); } catch (err) {} }
+    }
+    g.restore();
+  } finally { AU.ctx = live; }
+  if (AU.ctx){ if (MOOD.drone) droneTo(MOOD.drone[0], MOOD.drone[1], MOOD.drone[2], 1.2); roomTo(MOOD.room, 1); if (GRAIN || MOOD.grain) grainTo(MOOD.grain, 1); }
+  SC[si]._li = -99; poke();
+}
+function stepLine(dir){
+  if (!started) return;
+  if (ended){ if (dir < 0){ const ts = cueTimes(SC[SC.length - 1]); $('end').classList.remove('on'); seekTo(SC.length - 1, ts[ts.length - 1]); } return; }
+  const sc = SC[si], ts = cueTimes(sc); let idx = -1; ts.forEach((t, k) => { if (st >= t) idx = k; });
+  if (dir < 0){
+    const target = (idx >= 0 && st - ts[idx] > 2.5) ? idx : idx - 1;
+    if (target >= 0) seekTo(si, ts[target]);
+    else if (si > 0){ const pt = cueTimes(SC[si - 1]); seekTo(si - 1, pt.length ? pt[pt.length - 1] : 0); }
+    else seekTo(0, 0);
+  } else {
+    if (idx + 1 < ts.length) seekTo(si, ts[idx + 1]); else if (si < SC.length - 1) go(si + 1);
+  }
+}
+
 /* ─────────────── controls ─────────────── */
 const ctl = $('ctl'); let idleTO = null;
 function poke(){ if (!started) return; ctl.classList.add('show'); document.body.classList.remove('idle'); clearTimeout(idleTO); idleTO = setTimeout(() => { ctl.classList.remove('show'); document.body.classList.add('idle'); }, 2800); }
@@ -4804,6 +4844,8 @@ $('again').onclick = () => { $('end').classList.remove('on'); setPause(false); s
 $('bPrev').onclick = () => { if (ended) return go(SC.length - 1); go(st > 4 ? si : si - 1); };
 $('bNext').onclick = () => { if (!ended){ if (si < SC.length - 1) go(si + 1); else { hush(); finish(); } } };
 $('bPlay').onclick = () => setPause(!paused);
+$('bBack').onclick = () => stepLine(-1);
+$('bFwd').onclick = () => stepLine(1);
 $('bVoice').onclick = () => setVoice(!VOICE);
 $('bSubs').onclick = () => { SUBS = !SUBS; refreshBtns(); };
 $('bPlates').onclick = () => { PLATES = !PLATES; refreshBtns(); };
@@ -4814,8 +4856,10 @@ addEventListener('keydown', e => {
   if ($('atlas').classList.contains('on')){ if (e.key === 'Escape') closeAtlas(); return; }
   if (!started) return;
   if (e.code === 'Space'){ e.preventDefault(); setPause(!paused); }
-  else if (e.code === 'ArrowRight') $('bNext').click();
-  else if (e.code === 'ArrowLeft') $('bPrev').click();
+  else if (e.code === 'ArrowRight'){ e.preventDefault(); e.shiftKey ? $('bNext').click() : stepLine(1); }
+  else if (e.code === 'ArrowLeft'){ e.preventDefault(); e.shiftKey ? $('bPrev').click() : stepLine(-1); }
+  else if (e.code === 'PageDown') $('bNext').click();
+  else if (e.code === 'PageUp') $('bPrev').click();
   else if (e.key === 'f') $('bFs').click();
   else if (e.key === 'v') setVoice(!VOICE);
   else if (e.key === 'l') setLang(LANG === 'en' ? 'ru' : 'en');
