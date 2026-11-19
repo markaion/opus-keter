@@ -3917,7 +3917,20 @@ const M1 = { key:'M1', dur:170, star:0.08,
         for (const yy of [-1.5, 1.5]){ g.strokeRect(bx + 6, cy + yy * gap - 5, 10, 10); }
         label(tx('which slit?', 'какая щель?'), bx + 11, cy - gap * 3 - 6, 10, 0.55 * slit * detected, { rgb:INK.ice, ls:0.12 });
       }
-      if (t < 25.5 + 4.6 && t > 25.4){ const u = ((t - 25.5) * 3.2) % 1; glow(lerp(cx - S * 0.32, sx, u), cy + sin(t * 9) * S * 0.02 * u, 5, '255,250,235', 0.9 * slit); }
+      /* one photon at a time: it travels as a wave wide enough to meet both slits, leaves them as two
+         overlapping wavelets, and is only ever found as a single point on the screen */
+      if (t < 25.5 + 4.6 && t > 25.4){
+        const u = ((t - 25.5) * 1.6) % 1, x0 = cx - S * 0.32;
+        g.globalCompositeOperation = 'lighter'; g.lineWidth = 1;
+        if (u < 0.45){
+          const v = u / 0.45, x = lerp(x0, bx - 3, v), span = gap * (1 + 2.2 * v);
+          glow(x, cy, 5 * (1 - 0.6 * v), '255,250,235', 0.9 * slit * (1 - 0.5 * v));
+          g.strokeStyle = `rgba(255,244,220,${0.45 * slit * v})`; g.beginPath(); g.arc(x - span * 1.6, cy, span * 1.9, -0.55, 0.55); g.stroke();
+        } else {
+          const v = (u - 0.45) / 0.55, r = (sx - bx) * v;
+          for (const ys of [-1.5, 1.5]){ g.strokeStyle = `rgba(255,244,220,${0.5 * slit * (1 - v * 0.7)})`; g.beginPath(); g.arc(bx, cy + ys * gap, max(1, r), -0.85, 0.85); g.stroke(); }
+        }
+      }
     }
     /* narrower and narrower windows */
     if (win > 0.01 && t < 41){
