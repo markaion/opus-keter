@@ -357,7 +357,7 @@ function drawMask(mx, my, M, a, t, sp){
 
 
 /* ─────────────── shared palette, language and engraving helpers ─────────────── */
-let LANG = 'en';
+let LANG = 'pl';   /* Polish opens by default; a visitor's own choice is remembered */
 let TXL = {};   /* label dictionaries for the text-only languages, filled by the engine */
 const tx = (en, ru) => LANG === 'en' ? en : LANG === 'ru' ? (ru || en) : ((TXL[LANG] || {})[en] ?? ((LANG === 'uk' && ru) || en));
 const CYR = () => LANG === 'ru' || LANG === 'uk' || LANG === 'pl';   /* languages set in Old Standard TT, which carries their letters */
@@ -4918,7 +4918,7 @@ addEventListener('keydown', e => {
   else if (e.key === 'v') setVoice(!VOICE);
   else if (e.key === 'l') setLang(nextLang());
 });
-try { const l = localStorage.getItem('ok-lang'); if (LANGS.includes(l)) LANG = l; else { const nl = (navigator.language || '').toLowerCase().slice(0, 2); if (LANGS.includes(nl)) LANG = nl; } } catch (e) {}
+try { const l = localStorage.getItem('ok-lang'); if (LANGS.includes(l)) LANG = l; } catch (e) {}
 buildTree(); applyLang(); refreshBtns(); seedAll();
 requestAnimationFrame(frame);
 
